@@ -42,4 +42,6 @@ bin/ledCube.o: ledCube.c \
  /local/java/gcc-arm-none-eabi-10.3-2021.10/arm-none-eabi/include/sys/types.h \
  /local/java/gcc-arm-none-eabi-10.3-2021.10/arm-none-eabi/include/sys/_pthreadtypes.h \
  /local/java/gcc-arm-none-eabi-10.3-2021.10/arm-none-eabi/include/machine/types.h \
- /local/java/gcc-arm-none-eabi-10.3-2021.10/arm-none-eabi/include/sys/stdio.h
+ /local/java/gcc-arm-none-eabi-10.3-2021.10/arm-none-eabi/include/sys/stdio.h \
+ /local/java/gcc-arm-none-eabi-10.3-2021.10/arm-none-eabi/include/stdlib.h \
+ /local/java/gcc-arm-none-eabi-10.3-2021.10/arm-none-eabi/include/machine/stdlib.h

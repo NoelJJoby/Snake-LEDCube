@@ -3,6 +3,7 @@
 #include "libopencm3/stm32/adc.h"  //Needed to convert analogue signals to digital
 #include "libopencm3/stm32/usart.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 #define JOYSTICK_A_PORT GPIOA
 #define JOYSTICK_B_PORT GPIOC
@@ -19,6 +20,9 @@
 
 #define MAX_SNAKE_LENGTH 512
 
+// Increase to slow down updates to the cube
+#define MAX_UPDATE_COUNTER 2048
+
 typedef struct
 {
     int x;
@@ -30,6 +34,7 @@ struct Snake
 {
     int len;
     int ate;
+    int dead;
     Vector3 parts[MAX_SNAKE_LENGTH];
 };
 
@@ -53,10 +58,14 @@ void set_led_in_grid(Vector3 pos);
 void randomize_food_loc(void);
 void check_ate(void);
 void update_snake_and_food(void);
+void game_over_flash(void);
+void check_collided_with_self(void);
+void reset_game(void);
 
 int isVector3Equal(Vector3 pos1, Vector3 pos2);
 
 int joystick_channels[] = {1, 2, 6, 7};
+float raw_direction_input[4];
 int direction_input[4];
 /*
 0  -- Y-axis -1=up, 1=down
@@ -67,7 +76,7 @@ int direction_input[4];
 
 struct Snake snake;
 struct Food food;
-__uint8_t grid[8][8];
+int grid[8][8];
 
 // Cube Specific Functions
 
@@ -122,16 +131,18 @@ uint32_t joystick_read(int channel)
 
 void update_joystick_input()
 {
-    int value;
+    float value;
+    float normalized_value;
     for (int i = 0; i < 4; i++)
     {
         value = joystick_read(joystick_channels[i]);
-        value = (value - 1000) / 1000;
-        if (value < 0.5)
+        raw_direction_input[i] = value;
+        normalized_value = (value - 1000) / 1000;
+        if (normalized_value < 0.5)
         {
             direction_input[i] = -1;
         }
-        else if (value > 1.5)
+        else if (normalized_value > 1.5)
         {
             direction_input[i] = 1;
         }
@@ -204,9 +215,33 @@ void reset_grid(void)
     }
 }
 
+void game_over_flash(void)
+{
+    for (int x = 0; x < 8; x++)
+    {
+        for (int y = 0; y < 8; y++)
+        {
+            grid[x][y] = 255;
+        }
+    }
+}
+
 void set_led_in_grid(Vector3 pos)
 {
-    grid[pos.y][pos.x] += (1 << pos.z);
+    // original
+    //
+    // grid[pos.y][pos.x] += (1 << pos.z);
+    //
+    // This caused the whole game to be rotated 90 degrees, all the locations/directions
+    // where only accurate when you rotated the cube so you considered the right hand side face to
+    // be the forward looking face.
+
+    // This is certainly wrong and the movement and positions should be orientated around the
+    // forward face. So after more carfully reading code, I tried the following
+    // This hasn't been fully tested due to time constraints
+
+    // potential fix
+    grid[pos.y][pos.z] += (1 << pos.x);
 }
 
 void draw_snake_to_grid(void)
@@ -223,9 +258,45 @@ void move_snake(int x, int y, int z)
     {
         snake.parts[i] = snake.parts[i - 1];
     }
-    snake.parts[0].x += x;
-    snake.parts[0].y += y;
-    snake.parts[0].z -= z;
+
+    if (snake.parts[0].x + x > 7)
+    {
+        snake.parts[0].x = 0;
+    }
+    else if (snake.parts[0].x + x < 0)
+    {
+        snake.parts[0].x = 7;
+    }
+    else
+    {
+        snake.parts[0].x += x;
+    }
+
+    if (snake.parts[0].y + y > 7)
+    {
+        snake.parts[0].y = 0;
+    }
+    else if (snake.parts[0].y + y < 0)
+    {
+        snake.parts[0].y = 7;
+    }
+    else
+    {
+        snake.parts[0].y += y;
+    }
+
+    if (snake.parts[0].z + z > 7)
+    {
+        snake.parts[0].z = 0;
+    }
+    else if (snake.parts[0].z + z < 0)
+    {
+        snake.parts[0].z = 7;
+    }
+    else
+    {
+        snake.parts[0].z += z;
+    }
 }
 
 void randomize_food_loc()
@@ -242,6 +313,7 @@ void randomize_food_loc()
             if (isVector3Equal(food.pos, snake.parts[i]))
             {
                 InSnakeBody = 1;
+                break;
             }
         }
     }
@@ -275,26 +347,25 @@ void check_ate()
     }
 }
 
-void update_snake_and_food()
+void check_collided_with_self()
 {
-    if (snake.ate == 1)
+    for (int i = 1; i < snake.len; i++)
     {
-        snake.len += 1;
-        randomize_food_loc();
-        snake.ate = 0;
+        if (isVector3Equal(snake.parts[0], snake.parts[i]))
+        {
+            snake.dead = 1;
+            return;
+        }
     }
+    snake.dead = 0;
 }
 
-// Need to add Death Mec
-
-int main(void)
+void reset_game()
 {
-
-    joystick_setup();
-    cube_setup();
-
     snake.len = 3;
     snake.ate = 0;
+    snake.dead = 0;
+
     snake.parts[0].x = 3;
     snake.parts[0].y = 3;
     snake.parts[0].z = 0;
@@ -308,18 +379,54 @@ int main(void)
     snake.parts[2].z = 1;
 
     randomize_food_loc();
+}
+
+
+void update_snake_and_food()
+{
+    if (snake.dead){
+        reset_game();
+    }
+
+
+    if (snake.ate)
+    {
+        snake.len += 1;
+        randomize_food_loc();
+        snake.ate = 0;
+    }
+}
+
+
+int main(void)
+{
+    joystick_setup();
+    cube_setup();
+
+    int update_counter = 0;
+    reset_game();
 
     while (true)
     {
-        update_joystick_input();
+        update_counter++;
 
-        check_ate();
-        update_snake_and_food();
+        if (update_counter > MAX_UPDATE_COUNTER)
+        {
+            update_joystick_input();
 
-        move_snake(direction_input[1], direction_input[0], direction_input[2]);
+            check_ate();
+            check_collided_with_self();
+            update_snake_and_food();
 
-        reset_grid();
-        draw_snake_to_grid();
-        send_grid_to_cube();
+            move_snake(direction_input[1], direction_input[0], direction_input[2]);
+
+            reset_grid();
+            set_led_in_grid(food.pos);
+
+            draw_snake_to_grid();
+            send_grid_to_cube();
+
+            update_counter = 0;
+        }
     }
 }

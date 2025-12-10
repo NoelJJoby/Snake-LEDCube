@@ -20,7 +20,8 @@
 
 #define MAX_SNAKE_LENGTH 512
 
-// Increase to slow down updates to the cube
+// Used to control rate of frames sent to the cube
+// Program will wait this many loops before updating the game
 #define MAX_UPDATE_COUNTER 2048
 
 typedef struct
@@ -362,7 +363,7 @@ void check_collided_with_self()
 
 void reset_game()
 {
-    snake.len = 3;
+    snake.len = 1;
     snake.ate = 0;
     snake.dead = 0;
 
@@ -370,13 +371,13 @@ void reset_game()
     snake.parts[0].y = 3;
     snake.parts[0].z = 0;
 
-    snake.parts[1].x = 3;
-    snake.parts[1].y = 4;
-    snake.parts[1].z = 0;
+    // snake.parts[1].x = 3;
+    // snake.parts[1].y = 4;
+    // snake.parts[1].z = 0;
 
-    snake.parts[2].x = 3;
-    snake.parts[2].y = 4;
-    snake.parts[2].z = 1;
+    // snake.parts[2].x = 3;
+    // snake.parts[2].y = 4;
+    // snake.parts[2].z = 1;
 
     randomize_food_loc();
 }

@@ -1,0 +1,41 @@
+# Firstly run
+
+module load stm32
+ 
+# To run code
+
+Make new dir
+Add Makefile
+Edit Makefile
+    - make sure project, cfiles are correct 
+
+run make to build
+make clean to properly remove files
+
+# To test the controller run
+st-info --probe
+
+# Then to copy to the controller
+
+st-flash --reset write <programName>.bin 0x8000000
+
+st-flash --reset write ledCube.bin 0x8000000
+
+# To debug
+
+## In 1st terminal
+openocd --search /local/java/stm32/openocd/scripts \ -f interface/stlink.cfg -f board/st_nucleo_f3.cfg
+
+Get Port Number 3333
+
+## In 2nd terminal
+arm-none-eabi-gdb <programName>.elf
+target remote :<portNumber>
+
+To reset from the start
+monitor reset halt
+
+To recompile and use debuging close both and restart from above
+
+
+

@@ -1,10 +1,14 @@
-#include "libopencm3/stm32/rcc.h"  //Needed to enable clocks for particular GPIO ports
-#include "libopencm3/stm32/gpio.h" //Needed to define things on the GPIO
-#include "libopencm3/stm32/adc.h"  //Needed to convert analogue signals to digital
-#include "libopencm3/stm32/usart.h"
+#include "libopencm3/stm32/rcc.h"   //Needed to enable clocks for particular GPIO ports
+#include "libopencm3/stm32/gpio.h"  //Needed to define things on the GPIO
+#include "libopencm3/stm32/adc.h"   //Needed to convert analogue signals to digital
+#include "libopencm3/stm32/usart.h" // needed for communcation with the led cube
+
 #include <stdio.h>
 #include <stdlib.h>
 
+// Constants for pins and ports
+// Will not change throughout the current project
+// but will need to be updated in other versions/projects
 #define JOYSTICK_A_PORT GPIOA
 #define JOYSTICK_B_PORT GPIOC
 #define JOYSTICK_A_DIR_1_PIN GPIO1
@@ -18,10 +22,14 @@
 #define RX_PIN GPIO7
 #define USART_PORT USART1
 
+// The maximum length of the snake
+// currently set for an 8 * 8 * 8 cube
 #define MAX_SNAKE_LENGTH 512
 
 // Used to control rate of frames sent to the cube
 // Program will wait this many loops before updating the game
+// Otherwise the game runs very fast and players unable to control
+// effectively
 #define MAX_UPDATE_COUNTER 2048
 
 typedef struct
@@ -30,6 +38,7 @@ typedef struct
     int y;
     int z;
 } Vector3;
+// General struct to represent 3d coords
 
 struct Snake
 {
@@ -45,20 +54,23 @@ struct Food
     Vector3 pos;
 };
 
-//
+// function definitons for setting up the cube
 int cube_setup(void);
 int joystick_setup(void);
 uint32_t joystick_read(int);
 void update_joystick_input(void);
 
+// general functions for using the cube
+void set_led_in_grid(Vector3 pos);
 void send_grid_to_cube(void);
 void reset_grid(void);
+
+// function definitions for the snake game
 void draw_snake_to_grid(void);
 void move_snake(int x, int y, int z);
-void set_led_in_grid(Vector3 pos);
 void randomize_food_loc(void);
 void check_ate(void);
-void update_snake_and_food(void);
+void update_snake(void);
 void game_over_flash(void);
 void check_collided_with_self(void);
 void reset_game(void);
@@ -79,7 +91,7 @@ struct Snake snake;
 struct Food food;
 int grid[8][8];
 
-// Cube Specific Functions
+// Functions fo setting up the cube
 
 int joystick_setup(void)
 {
@@ -191,7 +203,7 @@ int cube_setup(void)
     return 0;
 }
 
-// Snake Game Functions
+// Functions for using the cube with the grid
 
 void send_grid_to_cube(void)
 {
@@ -216,17 +228,6 @@ void reset_grid(void)
     }
 }
 
-void game_over_flash(void)
-{
-    for (int x = 0; x < 8; x++)
-    {
-        for (int y = 0; y < 8; y++)
-        {
-            grid[x][y] = 255;
-        }
-    }
-}
-
 void set_led_in_grid(Vector3 pos)
 {
     // original
@@ -245,6 +246,19 @@ void set_led_in_grid(Vector3 pos)
     grid[pos.y][pos.z] += (1 << pos.x);
 }
 
+// Game Functions
+
+void game_over_flash(void)
+{
+    for (int x = 0; x < 8; x++)
+    {
+        for (int y = 0; y < 8; y++)
+        {
+            grid[x][y] = 255;
+        }
+    }
+}
+
 void draw_snake_to_grid(void)
 {
     for (int i = 0; i < snake.len; i++)
@@ -256,10 +270,15 @@ void draw_snake_to_grid(void)
 void move_snake(int x, int y, int z)
 {
     for (int i = snake.len - 1; i > 0; i--)
+    // Iterates through the snake backwards
+    // Doesn't include the head as it is considered seperately
     {
+        // moving the snake segments along
         snake.parts[i] = snake.parts[i - 1];
     }
 
+    // Code for wrapping the snake around
+    // x-axis
     if (snake.parts[0].x + x > 7)
     {
         snake.parts[0].x = 0;
@@ -273,6 +292,7 @@ void move_snake(int x, int y, int z)
         snake.parts[0].x += x;
     }
 
+    // y-axis
     if (snake.parts[0].y + y > 7)
     {
         snake.parts[0].y = 0;
@@ -286,6 +306,7 @@ void move_snake(int x, int y, int z)
         snake.parts[0].y += y;
     }
 
+    // z-axis
     if (snake.parts[0].z + z > 7)
     {
         snake.parts[0].z = 0;
@@ -320,26 +341,6 @@ void randomize_food_loc()
     }
 }
 
-int isVector3Equal(Vector3 pos1, Vector3 pos2)
-{
-    if (pos1.x != pos2.x)
-    {
-        return 0;
-    }
-
-    if (pos1.y != pos2.y)
-    {
-        return 0;
-    }
-
-    if (pos1.z != pos2.z)
-    {
-        return 0;
-    }
-
-    return 1;
-}
-
 void check_ate()
 {
     if (isVector3Equal(food.pos, snake.parts[0]))
@@ -371,24 +372,16 @@ void reset_game()
     snake.parts[0].y = 3;
     snake.parts[0].z = 0;
 
-    // snake.parts[1].x = 3;
-    // snake.parts[1].y = 4;
-    // snake.parts[1].z = 0;
-
-    // snake.parts[2].x = 3;
-    // snake.parts[2].y = 4;
-    // snake.parts[2].z = 1;
-
     randomize_food_loc();
 }
 
-
-void update_snake_and_food()
+void update_snake()
 {
-    if (snake.dead){
+    // Snake updates
+    if (snake.dead)
+    {
         reset_game();
     }
-
 
     if (snake.ate)
     {
@@ -396,38 +389,67 @@ void update_snake_and_food()
         randomize_food_loc();
         snake.ate = 0;
     }
+    move_snake(direction_input[1], direction_input[0], direction_input[2]);
 }
 
+// Utility Function
+int isVector3Equal(Vector3 pos1, Vector3 pos2)
+{
+    if (pos1.x != pos2.x)
+    {
+        return 0;
+    }
+
+    if (pos1.y != pos2.y)
+    {
+        return 0;
+    }
+
+    if (pos1.z != pos2.z)
+    {
+        return 0;
+    }
+
+    return 1;
+}
 
 int main(void)
 {
+    // Setting up the components
     joystick_setup();
     cube_setup();
 
+    // Game is intialized
     int update_counter = 0;
     reset_game();
 
     while (true)
     {
+        // Crude implementation to reduce updating speed
+        // Because otherwise runs updates at the speed of the processor
+        // This is way too fast to play the game and impossible to control
+        // Was added to make it playable, not tested fully
         update_counter++;
-
         if (update_counter > MAX_UPDATE_COUNTER)
         {
+            update_counter = 0;
+
+            // reads joystick values and updates the direction_input variable
             update_joystick_input();
 
+            // checks the current status of the game
             check_ate();
             check_collided_with_self();
-            update_snake_and_food();
 
-            move_snake(direction_input[1], direction_input[0], direction_input[2]);
+            // Updates the current state of the game
+            update_snake();
 
+
+            // Redraws the grid onto the cube
             reset_grid();
             set_led_in_grid(food.pos);
-
             draw_snake_to_grid();
             send_grid_to_cube();
-
-            update_counter = 0;
         }
     }
 }

@@ -244,6 +244,9 @@ void set_led_in_grid(Vector3 pos)
 
     // potential fix
     grid[pos.y][pos.z] += (1 << pos.x);
+    
+    // each led is dependent on the binary string given by the value of the particular row
+    // to set an led, add the led's position's value to the grid array. 
 }
 
 // Game Functions
@@ -254,7 +257,7 @@ void game_over_flash(void)
     {
         for (int y = 0; y < 8; y++)
         {
-            grid[x][y] = 255;
+            grid[x][y] = 255;// sets all leds in the row
         }
     }
 }
@@ -263,7 +266,7 @@ void draw_snake_to_grid(void)
 {
     for (int i = 0; i < snake.len; i++)
     {
-        set_led_in_grid(snake.parts[i]);
+        set_led_in_grid(snake.parts[i]);// sets each led in the snake
     }
 }
 
@@ -278,9 +281,12 @@ void move_snake(int x, int y, int z)
     }
 
     // Code for wrapping the snake around
+    // if the head goes out of bounds
+    // reset it to the otherside
     // x-axis
     if (snake.parts[0].x + x > 7)
     {
+        
         snake.parts[0].x = 0;
     }
     else if (snake.parts[0].x + x < 0)
@@ -323,6 +329,8 @@ void move_snake(int x, int y, int z)
 
 void randomize_food_loc()
 {
+    // randomly sets a food position 
+    // given the snake is there already
     int InSnakeBody = 1;
     while (InSnakeBody)
     {
@@ -345,12 +353,15 @@ void check_ate()
 {
     if (isVector3Equal(food.pos, snake.parts[0]))
     {
+        // if the food coincides with the snake head
+        // set snake.ate
         snake.ate = 1;
     }
 }
 
 void check_collided_with_self()
 {
+    // for every snake part, check if the head coincides with it
     for (int i = 1; i < snake.len; i++)
     {
         if (isVector3Equal(snake.parts[0], snake.parts[i]))
@@ -368,6 +379,8 @@ void reset_game()
     snake.ate = 0;
     snake.dead = 0;
 
+    // resets the snake to the middle led of the 
+    // forward face
     snake.parts[0].x = 3;
     snake.parts[0].y = 3;
     snake.parts[0].z = 0;
@@ -429,6 +442,7 @@ int main(void)
         // Because otherwise runs updates at the speed of the processor
         // This is way too fast to play the game and impossible to control
         // Was added to make it playable, not tested fully
+        // in an optimal solution, would implement deltatime and use that
         update_counter++;
         if (update_counter > MAX_UPDATE_COUNTER)
         {
